@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QR Decrypt Scanner</title>
+<style>
+:root{--bg:#f5f6fa;--card:#fff;--text:#14161f;--muted:#6b7084;--line:#e3e5ee;--accent:#4f46e5;--accent-t:#fff;--ok:#0f9d58;--okbg:#e6f6ee;--err:#d93025;--errbg:#fdeceb;--warn:#b26a00;--warnbg:#fff4e0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1017;--card:#171a24;--text:#eceef6;--muted:#9096ad;--line:#2a2e3d;--accent:#818cf8;--accent-t:#0e1017;--ok:#4ade80;--okbg:#10281b;--err:#f87171;--errbg:#2c1517;--warn:#fbbf24;--warnbg:#2b2210}}
+:root[data-theme="dark"]{--bg:#0e1017;--card:#171a24;--text:#eceef6;--muted:#9096ad;--line:#2a2e3d;--accent:#818cf8;--accent-t:#0e1017;--ok:#4ade80;--okbg:#10281b;--err:#f87171;--errbg:#2c1517;--warn:#fbbf24;--warnbg:#2b2210}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;min-height:100vh}
+main{max-width:460px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:1.4rem;margin:0 0 4px;display:flex;gap:10px;align-items:center}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.92rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--bg);padding:4px;border-radius:12px;margin-bottom:14px}
+.tabs button{border:0;background:transparent;color:var(--muted);padding:10px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:#000;display:grid;place-items:center}
+video{width:100%;height:100%;object-fit:cover;display:none}
+.stage.live video{display:block}
+.frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.85);border-radius:18px;display:none;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.stage.live .frame{display:block}
+.idle{color:#c9cde0;text-align:center;padding:20px;font-size:.92rem}
+.stage.live .idle{display:none}
+.btn{width:100%;margin-top:12px;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-t)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.row{display:flex;gap:8px}.row .btn{margin-top:12px}
+.drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:36px 16px;text-align:center;cursor:pointer;color:var(--muted)}
+.drop.over,.drop:hover{border-color:var(--accent);color:var(--text)}
+.drop b{display:block;color:var(--text);margin-bottom:4px}
+.drop img{max-width:100%;max-height:200px;border-radius:8px;display:block;margin:0 auto 8px}
+input[type=file]{display:none}
+.hint{font-size:.8rem;color:var(--muted);margin:10px 0 0;text-align:center}
+.result{margin-top:14px;border-radius:14px;padding:14px;display:none}
+.result.show{display:block}
+.result.ok{background:var(--okbg)}.result.err{background:var(--errbg)}.result.warn{background:var(--warnbg)}
+.lbl{font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.ok .lbl{color:var(--ok)}.err .lbl{color:var(--err)}.warn .lbl{color:var(--warn)}
+.url{margin:6px 0 0;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem}
+.msg{margin:6px 0 0;font-size:.92rem}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:.88rem;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1><span aria-hidden="true">🔐</span> QR Decrypt Scanner</h1>
+  <p class="sub">Scan QR terenkripsi, dapatkan URL aslinya.</p>
+
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabCam" aria-selected="true">Kamera</button>
+      <button role="tab" id="tabFile" aria-selected="false">Unggah gambar</button>
+    </div>
+
+    <section id="panelCam">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <div class="frame"></div>
+        <div class="idle">Tekan tombol di bawah untuk mengaktifkan kamera</div>
+      </div>
+      <button class="btn" id="camBtn">Mulai scan</button>
+      <button class="btn ghost" id="shotBtn">Ambil foto QR (kamera bawaan HP)</button>
+      <input type="file" id="shot" accept="image/*" capture="environment">
+    </section>
+
+    <section id="panelFile" hidden>
+      <label class="drop" id="drop" tabindex="0">
+        <div id="dropContent"><b>Pilih atau seret gambar QR</b>PNG, JPG, atau screenshot</div>
+        <input type="file" id="file" accept="image/*">
+      </label>
+    </section>
+
+    <div class="result" id="result" role="status" aria-live="polite">
+      <div class="lbl" id="rLabel"></div>
+      <p class="url" id="rUrl" hidden></p>
+      <p class="msg" id="rMsg" hidden></p>
+      <div class="row" id="rActions" hidden>
+        <button class="btn" id="openBtn">Buka link</button>
+        <button class="btn ghost" id="copyBtn">Salin</button>
+      </div>
+    </div>
+    <button class="btn ghost" id="againBtn" hidden>Scan lagi</button>
+  </div>
+  <p class="hint">Dekripsi berjalan sepenuhnya di perangkatmu.</p>
+</main>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+const SALT = "MySaltValue";
+const PASSPHRASE = "MySuperSecretKey123";
+const PREFIX = "demo_", ITERATIONS = 65536;
+
+const $ = id => document.getElementById(id);
+const enc = new TextEncoder();
+let keyPromise = null, stream = null, rafId = 0, currentUrl = "";
+
+function getKey(){
+  if(!keyPromise){
+    keyPromise = crypto.subtle.importKey("raw", enc.encode(PASSPHRASE), "PBKDF2", false, ["deriveKey"])
+      .then(km => crypto.subtle.deriveKey(
+        {name:"PBKDF2", salt:enc.encode(SALT), iterations:ITERATIONS, hash:"SHA-256"},
+        km, {name:"AES-CBC", length:256}, false, ["decrypt"]));
+  }
+  return keyPromise;
+}
+
+async function decrypt(payload){
+  let b64 = payload.trim();
+  if(b64.startsWith(PREFIX)) b64 = b64.slice(PREFIX.length);
+  let raw;
+  try{ raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+  catch{ throw new Error("Format data QR tidak dikenali."); }
+  if(raw.length < 32 || raw.length % 16 !== 0) throw new Error("Data QR bukan payload terenkripsi yang valid.");
+  const key = await getKey();
+  try{
+    const plain = await crypto.subtle.decrypt({name:"AES-CBC", iv:raw.slice(0,16)}, key, raw.slice(16));
+    return new TextDecoder("utf-8", {fatal:true}).decode(plain);
+  }catch{ throw new Error("Gagal mendekripsi. QR ini mungkin dibuat dengan kunci lain."); }
+}
+
+/* ---------- UI helpers ---------- */
+function showResult(kind, label, {url, msg, actions}={}){
+  const r = $("result");
+  r.className = "result show " + kind;
+  $("rLabel").textContent = label;
+  $("rUrl").hidden = !url; $("rUrl").textContent = url || "";
+  $("rMsg").hidden = !msg; $("rMsg").textContent = msg || "";
+  $("rActions").hidden = !actions;
+  $("againBtn").hidden = false;
+}
+function resetResult(){ $("result").className = "result"; $("againBtn").hidden = true; currentUrl = ""; }
+function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1800); }
+
+async function handlePayload(text){
+  try{
+    const out = (await decrypt(text)).trim();
+    let u; try{ u = new URL(out); }catch{ u = null; }
+    if(u && (u.protocol === "https:" || u.protocol === "http:")){
+      currentUrl = u.href;
+      showResult("ok", "URL ditemukan", {url: out, actions: true});
+    }else{
+      showResult("warn", "Hasil bukan URL web", {url: out, msg: "Demi keamanan, hanya link http(s) yang bisa dibuka."});
+    }
+  }catch(e){ showResult("err", "Gagal", {msg: e.message}); }
+}
+
+/* ---------- Camera ---------- */
+async function startCam(){
+  resetResult();
+  if(!window.isSecureContext || !navigator.mediaDevices){
+    showResult("err","Halaman tidak aman (bukan HTTPS)",{msg:"Kamera dan dekripsi hanya jalan di halaman HTTPS. Sepertinya halaman ini dibuka dari file lokal. Buka lewat link https."});
+    return;
+  }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}, audio:false});
+  }catch(e){
+    const denied = e && (e.name === "NotAllowedError" || e.name === "SecurityError");
+    showResult("err","Kamera tidak tersedia",{msg: denied
+      ? "Akses kamera ditolak atau diblokir browser. Izinkan kamera, atau pakai tombol Ambil foto QR di bawah."
+      : "Kamera tidak ditemukan atau sedang dipakai aplikasi lain. Coba tombol Ambil foto QR."});
+    return;
+  }
+  const v = $("video"); v.srcObject = stream; await v.play();
+  $("stage").classList.add("live");
+  $("camBtn").textContent = "Hentikan kamera";
+  $("camBtn").dataset.on = "1";
+  tick();
+}
+function stopCam(){
+  cancelAnimationFrame(rafId);
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+  $("video").srcObject = null;
+  $("stage").classList.remove("live");
+  $("camBtn").textContent = "Mulai scan";
+  delete $("camBtn").dataset.on;
+}
+const cv = document.createElement("canvas"), cx = cv.getContext("2d", {willReadFrequently:true});
+function tick(){
+  const v = $("video");
+  if(v.readyState >= 2 && v.videoWidth){
+    const s = Math.min(1, 720 / v.videoWidth);
+    cv.width = v.videoWidth*s; cv.height = v.videoHeight*s;
+    cx.drawImage(v, 0, 0, cv.width, cv.height);
+    const img = cx.getImageData(0,0,cv.width,cv.height);
+    const code = jsQR(img.data, img.width, img.height, {inversionAttempts:"dontInvert"});
+    if(code && code.data){ stopCam(); if(navigator.vibrate) navigator.vibrate(60); handlePayload(code.data); return; }
+  }
+  rafId = requestAnimationFrame(tick);
+}
+$("camBtn").onclick = () => $("camBtn").dataset.on ? stopCam() : startCam();
+$("shotBtn").onclick = () => { stopCam(); $("shot").click(); };
+$("shot").onchange = e => { scanFile(e.target.files[0]); e.target.value = ""; };
+
+/* ---------- Image file ---------- */
+function scanFile(file){
+  if(!file || !file.type.startsWith("image/")){ showResult("err","File tidak valid",{msg:"Pilih file gambar."}); return; }
+  resetResult();
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const s = Math.min(1, 1400 / Math.max(img.width, img.height));
+    cv.width = img.width*s; cv.height = img.height*s;
+    cx.drawImage(img, 0, 0, cv.width, cv.height);
+    const d = cx.getImageData(0,0,cv.width,cv.height);
+    const code = jsQR(d.data, d.width, d.height, {inversionAttempts:"attemptBoth"});
+    $("dropContent").innerHTML = ""; const p = new Image(); p.src = url; p.alt = "Pratinjau gambar";
+    $("dropContent").append(p, Object.assign(document.createElement("span"), {textContent:"Ketuk untuk ganti gambar"}));
+    code && code.data ? handlePayload(code.data)
+      : showResult("err","QR tidak terdeteksi",{msg:"Pastikan QR terlihat jelas, tajam, dan tidak terpotong."});
+  };
+  img.onerror = () => showResult("err","Gagal membaca gambar",{msg:"File mungkin rusak."});
+  img.src = url;
+}
+const drop = $("drop");
+$("file").onchange = e => { scanFile(e.target.files[0]); e.target.value = ""; };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => scanFile(e.dataTransfer.files[0]));
+drop.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("file").click(); } });
+
+/* ---------- Tabs & actions ---------- */
+function setTab(cam){
+  stopCam(); resetResult();
+  $("tabCam").setAttribute("aria-selected", cam); $("tabFile").setAttribute("aria-selected", !cam);
+  $("panelCam").hidden = !cam; $("panelFile").hidden = cam;
+}
+$("tabCam").onclick = () => setTab(true);
+$("tabFile").onclick = () => setTab(false);
+
+$("openBtn").onclick = () => { if(currentUrl) window.open(currentUrl, "_blank", "noopener,noreferrer"); };
+$("copyBtn").onclick = async () => {
+  try{ await navigator.clipboard.writeText(currentUrl); toast("Link disalin"); }
+  catch{ toast("Gagal menyalin"); }
+};
+$("againBtn").onclick = () => {
+  resetResult();
+  if(!$("panelCam").hidden) startCam();
+  else { $("dropContent").innerHTML = "<b>Pilih atau seret gambar QR</b>PNG, JPG, atau screenshot"; $("file").click(); }
+};
+if(!window.crypto || !crypto.subtle) showResult("err","Browser tidak didukung",{msg:"Halaman ini perlu HTTPS dan browser modern."});
+</script>
+</body>
+</html>
